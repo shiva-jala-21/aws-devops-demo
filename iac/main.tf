@@ -211,3 +211,104 @@ resource "aws_lb_listener" "app" {
     target_group_arn = aws_lb_target_group.app.arn
   }
 }
+
+resource "aws_ecs_cluster" "app" {
+  name = "aws-devops-demo-cluster"
+
+  tags = {
+    Name = "aws-devops-demo-cluster"
+  }
+}
+
+resource "aws_cloudwatch_log_group" "app" {
+  name              = "/ecs/aws-devops-demo"
+  retention_in_days = 7
+
+  tags = {
+    Name = "aws-devops-demo-logs"
+  }
+}
+
+resource "aws_ecs_task_definition" "app" {
+  family                   = "aws-devops-demo"
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+
+  cpu    = "256"
+  memory = "512"
+
+  execution_role_arn = aws_iam_role.ecs_task_execution_role.arn
+
+  container_definitions = jsonencode([
+    {
+      name      = "python-app"
+      image     = "${aws_ecr_repository.python_app.repository_url}:latest"
+      essential = true
+
+      portMappings = [
+        {
+          containerPort = 5000
+          hostPort      = 5000
+          protocol      = "tcp"
+        }
+      ]
+
+      logConfiguration = {
+        logDriver = "awslogs"
+
+        options = {
+          awslogs-group         = aws_cloudwatch_log_group.app.name
+          awslogs-region        = var.aws_region
+          awslogs-stream-prefix = "ecs"
+        }
+      }
+    }
+  ])
+
+  tags = {
+    Name = "aws-devops-demo-task"
+  }
+}
+
+resource "aws_ecs_service" "app" {
+  name            = "aws-devops-demo-service"
+  cluster         = aws_ecs_cluster.app.id
+  task_definition = aws_ecs_task_definition.app.arn
+
+  desired_count = 1
+  launch_type   = "FARGATE"
+
+  health_check_grace_period_seconds = 60
+
+  network_configuration {
+    subnets = [
+      aws_subnet.public.id,
+      aws_subnet.public2.id
+    ]
+
+    security_groups = [
+      aws_security_group.ecs_security_group.id
+    ]
+
+    assign_public_ip = true
+  }
+
+  load_balancer {
+    target_group_arn = aws_lb_target_group.app.arn
+    container_name   = "python-app"
+    container_port   = 5000
+  }
+
+  depends_on = [
+    aws_lb_listener.app
+  ]
+
+  tags = {
+    Name = "aws-devops-demo-service"
+  }
+  lifecycle {
+    ignore_changes = [
+      task_definition
+    ]
+  }
+}

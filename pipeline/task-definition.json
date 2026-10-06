@@ -1,0 +1,32 @@
+{
+  "family": "aws-devops-demo",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
+  "cpu": "256",
+  "memory": "512",
+  "executionRoleArn": "arn:aws:iam::148014383158:role/aws-devops-demo-ecs-task-execution-role",
+  "containerDefinitions": [
+    {
+      "name": "python-app",
+      "image": "148014383158.dkr.ecr.ap-south-1.amazonaws.com/aws-devops-demo:latest",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 5000,
+          "hostPort": 5000,
+          "protocol": "tcp"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/aws-devops-demo",
+          "awslogs-region": "ap-south-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ]
+}
